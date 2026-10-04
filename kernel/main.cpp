@@ -336,7 +336,7 @@ static void setup_busybox_vfs_aliases()
 void init_cpu()
 {
     __asm__ __volatile__("movq %%cr0, %%rax\n\t"
-                         "and $0xFFF3, %%ax	\n\t" // clear coprocessor emulation CR0.EM and CR0.TS
+                         "and $0xFFF3, %%ax\t\n\t" // clear coprocessor emulation CR0.EM and CR0.TS
                          "or $0x2, %%ax\n\t"      // set coprocessor monitoring  CR0.MP
                          "movq %%rax, %%cr0\n\t"
                          "movq %%cr4, %%rax\n\t"
@@ -640,27 +640,14 @@ extern "C" void KernelMain(const FrameBufferConfig &fbc, EFI_SYSTEM_TABLE &Syste
     } else {
         write_serial_string("AHCI: keeping conservative IO path on vmware/real hardware\n");
     }
-    user_session_use_login();
-    create_user_process_from_file((char *)"/apps/system/shell.elf", NULL, NULL);
 
-    // delay_s_hp(60);
-
-    // uint64_t utsk = page_alloc_random(get_current_directory(), 114, PTE_PRESENT | PTE_USER);
-    // memcpy((void *)utsk, (void *)test_task, 114);
-    // create_user_thread((void *)utsk, NULL, (char *)"test_task2", ugp);
-
+    // OpenXSKernel intentionally defers userland startup to a future PID 1 initializer.
+    // The kernel should not launch the shell or login session by itself.
+    write_serial_string("BOOT: userland startup deferred; no PID 1 initializer launched by kernel\n");
 
     enable_scheduler();
     open_interrupt;
     no_interrupt = false;
-
-    // no_interrupt = true;
-    // close_interrupt;
-    // disable_scheduler();
-
-    // enable_scheduler();
-    // open_interrupt;
-    // no_interrupt = false;
 
     while (true)
     {
