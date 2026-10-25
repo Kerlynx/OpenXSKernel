@@ -118,6 +118,7 @@ int fatfs_mkdir(void *parent, const char *name, vfs_node_t node) {
     char  *new_path = (char*)malloc(strlen(p->path) + strlen((char *)name) + 1 + 1);
     sprintf(new_path, "%s/%s", p->path, name);
     FRESULT res = f_mkdir(new_path);
+    write_serial_fmt("fatfs_mkdir: path=%s res=%d\n", new_path, (int)res);
     if (res != FR_OK) 
     {
         if (res != FR_EXIST) write_serial_fmt("fatfs_mkdir: path=%s res=%d\n", new_path, res);
@@ -363,6 +364,7 @@ void fatfs_open(void *parent, const char *name, vfs_node_t node) {
     FILINFO fno;
     FRESULT res = f_stat(new_path, &fno);
     if (res != FR_OK) {
+        write_serial_fmt("fatfs_open: f_stat fail path=%s res=%d\n", new_path, (int)res);
         free(new_path);
         free(nw);
         fatfs_unlock();
@@ -592,6 +594,7 @@ int fatfs_stat(void *handle, vfs_node_t node) {
     FRESULT res = f_stat(f->path, &fno);
     if (res != FR_OK) 
     {
+        write_serial_fmt("fatfs_stat: f_stat fail path=%s res=%d\n", f->path, (int)res);
         fatfs_unlock();
         return -1;
     }
