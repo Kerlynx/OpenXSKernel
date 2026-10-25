@@ -706,6 +706,7 @@ int fatfs_rename(file_t file, const char *nw) {
         target_path = fat_target;
     }
 
+    write_serial_fmt("fatfs_rename: old=%s nw=%s target=%s\n", file->path, nw, target_path);
     fatfs_lock();
     
     FRESULT res = f_rename((const char *)file->path, target_path);
@@ -713,7 +714,7 @@ int fatfs_rename(file_t file, const char *nw) {
     fatfs_unlock();
     free(fat_target);
 
-    if (res != FR_OK) return -1;
+    if (res != FR_OK) { write_serial_fmt("fatfs_rename: f_rename failed res=%d\n", (int)res); return -1; }
     return 0;
 }
 
