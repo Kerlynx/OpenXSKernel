@@ -403,7 +403,7 @@ errno_t vfs_mkfile(const char *name) {
         parent = vfs_open(fullpath);
     }
 
-    if (parent == NULL || parent->type != file_dir) { return VFS_STATUS_FAILED; }
+    if (parent == NULL || parent->type != file_dir) { write_serial_fmt("vfs_mkfile: parent fail fullpath=%s parent=%p type=%d\n", fullpath, (void*)parent, parent ? parent->type : -1); return VFS_STATUS_FAILED; }
 
     // 创建文件
     vfs_node_t node = vfs_child_append(parent, filename, NULL);
