@@ -160,6 +160,7 @@ typedef struct vfs_filesystem {
 } *vfs_filesystem_t;
 
 struct vfs_node {           // vfs节点
+    uint64_t   ime_protection; // 内核态 IME 对象策略（非打开标志）
     vfs_node_t parent;      // 父目录
     vfs_node_t linkto;      // 符号链接指向的节点
     char      *name;        // 名称

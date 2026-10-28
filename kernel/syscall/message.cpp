@@ -1,3 +1,4 @@
+#include <input_method.h>
 #include <cpu/lock.h>
 #include <cpu/msr.h>
 #include <errno.h>
@@ -13,6 +14,8 @@
 #include <mm/frame.h>
 #include <pipe.h>
 
+static ImeTextSink ime_text_sink;
+void ime_set_text_sink(ImeTextSink sink) { ime_text_sink = sink; }
 static spin_t getch_lock = SPIN_INIT;
 
 static bool message_pipe_write_handle_valid(tcb_t task, fd_file_handle **out_handle)
@@ -161,6 +164,7 @@ void do_message_unfiltered(uint64_t msg_type, uint64_t hData, uint64_t lData, Ms
     if (ftask == NULL || ftask->parent_group == NULL || ftask->parent_group->xtttp_stc == NULL) return;
 
     tcb_t current = ftask;
+    if (ime_text_sink) ime_text_sink(msg_type, lData, (uint64_t)WinMpf, ftask);
 
     // MSG_CHAR 携带一个打包的 UTF-8 字符（最多 4 字节），喂进终端环形缓冲
     if (msg_type == MSG_CHAR)
@@ -195,9 +199,9 @@ void do_message_unfiltered(uint64_t msg_type, uint64_t hData, uint64_t lData, Ms
     // 空的就不用管了
 }
 
-// 纯内核：无输入法过滤，do_message 直接透传到未过滤路径
 void do_message(uint64_t msg_type, uint64_t hData, uint64_t lData, MsgPrcor WinMpf, tcb_t ftask)
 {
+    if (ime_filter_message(msg_type, lData, (uint64_t)WinMpf, ftask)) return;
     do_message_unfiltered(msg_type, hData, lData, WinMpf, ftask);
 }
 
