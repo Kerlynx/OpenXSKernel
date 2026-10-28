@@ -3,6 +3,7 @@
 #include <cpu/msr.h>
 #include <errno.h>
 #include <fs/vfs/vfs.h>
+#include <input_method.h>
 #include <installer_protocol.h>
 #include <math.hpp>
 #include <mm/lazyalloc.h>
@@ -705,6 +706,23 @@ extern "C" uint64_t c_syscall_handler(struct X64_REGS *regs, uint64_t user_rsp)
         regs->rax = (uint64_t)-1;
         break;
     case XAPI_NOTIFY_SEND: case XAPI_NOTIFY_SET_PROCOR: regs->rax = (uint64_t)-ENOSYS; break;
+
+    /* Input method ABI: number ranges 7474-7485, dispatched to the kernel-side
+       IME state machine. The user request struct pointer is regs->rdi. */
+    case XAPI_IME_REGISTER:
+    case XAPI_IME_ENUM:
+    case XAPI_IME_GET_STATE:
+    case XAPI_IME_SET_ACTIVE:
+    case XAPI_IME_UNREGISTER:
+    case XAPI_IME_ATTACH:
+    case XAPI_IME_GET_EVENT:
+    case XAPI_IME_REPLY_EVENT:
+    case XAPI_IME_UPDATE_UI:
+    case XAPI_IME_SET_MODE:
+    case XAPI_IME_SET_CONTEXT:
+    case XAPI_IME_USER_DATA:
+        regs->rax = (uint64_t)ime_syscall(syscall_number, regs->rdi);
+        break;
 
     /* Private XJ380 extension range; this is not a stable public ABI. */
     case SXAH_CHECK_TERMINAL_INIT_STATUS: regs->rax = (uint64_t)check_terminal_init_status(); break;
