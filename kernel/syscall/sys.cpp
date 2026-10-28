@@ -1,3 +1,4 @@
+#include <input_method.h>
 #include <syscall/syscall.h>
 #include <proto.hpp>
 #include <fs/vfs/vfs.h>
@@ -4358,6 +4359,8 @@ sys_(rename, char *oldpath, char *newpath)
         free(nnewpath);
         return SYSCALL_FAULT_(ENOMEM);
     }
+    if (!ime_vfs_access(NULL, noldpath, IME_FILE_REMOVE) || !ime_vfs_access(NULL, nnewpath, IME_FILE_WRITE))
+    { free(noldpath); free(nnewpath); return SYSCALL_FAULT_(EACCES); }
     vfs_node_t oldnode  = vfs_open_no_follow(noldpath);
     if (!oldnode)
     {
@@ -4371,6 +4374,15 @@ sys_(rename, char *oldpath, char *newpath)
         free(noldpath);
         free(nnewpath);
         return 0;
+    }
+    if (!ime_vfs_access(oldnode, NULL, IME_FILE_REMOVE) ||
+        (newnode && !ime_vfs_access(newnode, NULL, IME_FILE_REMOVE)))
+    {
+        if (newnode) vfs_close(newnode);
+        vfs_close(oldnode);
+        free(noldpath);
+        free(nnewpath);
+        return SYSCALL_FAULT_(EACCES);
     }
     if (newnode) { vfs_delete(newnode); }
     size_t     ret    = vfs_rename(oldnode, nnewpath) == VFS_STATUS_SUCCESS ? 0 : SYSCALL_FAULT_(ENOENT);
@@ -4405,6 +4417,14 @@ sys_(renameat, int olddirfd, char *oldpath, int newdirfd, char *newpath)
         return SYSCALL_FAULT_((int)-path_ret);
     }
 
+    if (!ime_vfs_access(NULL, resolved_old, IME_FILE_REMOVE) ||
+        !ime_vfs_access(NULL, resolved_new, IME_FILE_WRITE))
+    {
+        free(resolved_old);
+        free(resolved_new);
+        return SYSCALL_FAULT_(EACCES);
+    }
+
     vfs_node_t oldnode = vfs_open_no_follow(resolved_old);
     if (!oldnode)
     {
@@ -4419,6 +4439,15 @@ sys_(renameat, int olddirfd, char *oldpath, int newdirfd, char *newpath)
         free(resolved_old);
         free(resolved_new);
         return 0;
+    }
+    if (!ime_vfs_access(oldnode, NULL, IME_FILE_REMOVE) ||
+        (newnode && !ime_vfs_access(newnode, NULL, IME_FILE_REMOVE)))
+    {
+        if (newnode) vfs_close(newnode);
+        vfs_close(oldnode);
+        free(resolved_old);
+        free(resolved_new);
+        return SYSCALL_FAULT_(EACCES);
     }
     if (newnode) { vfs_delete(newnode); }
 
@@ -5226,6 +5255,7 @@ sys_(mincore, uint64_t addr, uint64_t size, uint64_t vec)
 
 sys_(pivot_root, char *new_root, char *put_old)
 {
+    if (!ime_vfs_access(NULL, NULL, IME_FILE_MOUNT)) return SYSCALL_FAULT_(EPERM);
     //TODO 未经测试和验证的实现
     vfs_node_t nroot = vfs_open(new_root);
     vfs_node_t src_root;

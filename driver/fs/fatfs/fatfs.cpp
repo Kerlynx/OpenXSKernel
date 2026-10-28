@@ -1,3 +1,4 @@
+#include <input_method.h>
 #define ALL_IMPLEMENTATION
 #include "errno.h"
 #include "fs/fatfs/ff.h"
@@ -130,12 +131,54 @@ int fatfs_mkdir(void *parent, const char *name, vfs_node_t node) {
     return 0;
 }
 
+static bool fatfs_name_equal(const char *a, const char *b);
+
+static void fatfs_mark_ime_protection(vfs_node_t node, const char *path, const FILINFO *info)
+{
+    ime_vfs_resolved_name(node, info->fname);
+    if (node->parent != rootdir) return;
+    char *parent_path = strdup(path);
+    if (!parent_path)
+    {
+        ime_vfs_resolved_name(node, "settings.json");
+        return;
+    }
+    char *slash = strrchr(parent_path, '/');
+    if (slash) *slash = 0;
+    DIR directory;
+    FILINFO entry;
+    bool resolved = false;
+    if (f_opendir(&directory, parent_path) == FR_OK)
+    {
+        while (f_readdir(&directory, &entry) == FR_OK && entry.fname[0])
+        {
+            if (fatfs_name_equal(node->name, entry.fname) || fatfs_name_equal(node->name, entry.altname))
+            {
+                ime_vfs_resolved_name(node, entry.fname);
+                resolved = true;
+                break;
+            }
+        }
+        f_closedir(&directory);
+    }
+    // Fail closed when the existing file cannot be identified, rather than
+    // allowing an unresolved alias to overwrite a protected root entry.
+    if (!resolved) ime_vfs_resolved_name(node, "settings.json");
+    free(parent_path);
+}
+
 int fatfs_mkfile(void *parent, const char *name, vfs_node_t node) {
     fatfs_lock();
 
     file_t p        = (file_t)parent;
     char  *new_path = (char*)malloc(strlen(p->path) + strlen((char *)name) + 1 + 1);
     sprintf(new_path, "%s/%s", p->path, name);
+    FILINFO existing;
+    if (f_stat(new_path, &existing) == FR_OK) fatfs_mark_ime_protection(node, new_path, &existing);
+    if (!ime_vfs_access(node, NULL, IME_FILE_WRITE))
+    {
+        free(new_path); fatfs_unlock(); return -EACCES;
+    }
     FIL fp;
     FRESULT res = f_open(&fp, new_path, FA_CREATE_ALWAYS | FA_WRITE);
     if (res != FR_OK) 
@@ -368,6 +411,7 @@ void fatfs_open(void *parent, const char *name, vfs_node_t node) {
         fatfs_unlock();
         return;
     }
+    fatfs_mark_ime_protection(node, new_path, &fno);
     fatfs_apply_filinfo(node, &fno);
     if (fno.fattrib & AM_DIR) {
         // node.
