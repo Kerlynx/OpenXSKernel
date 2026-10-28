@@ -20,6 +20,7 @@
 #include <task/pcb.h>
 #include <task/scheduler.h>
 #include <user/user.h>
+#include <input_method.h>
 #include <user/runfile.h>
 #include <cpu/lock.h>
 #include <cpu/regio.h>
@@ -1019,6 +1020,7 @@ int create_user_process_from_file(char *path, pcb_t pcb, char *argv[])
         return (int)tid;
     }
 
+    ime_process_loaded(group);
     return group->pid;
 }
 

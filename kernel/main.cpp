@@ -40,6 +40,7 @@
 #include <user/info_register.h>
 #include <hda/vsound.h>
 #include <hda/hda.h>
+#include <input_method.h>
 #include <installer_mode.h>
 
 const FrameBufferConfig *fbc_addr;
@@ -517,6 +518,7 @@ extern "C" void KernelMain(const FrameBufferConfig &fbc, EFI_SYSTEM_TABLE &Syste
     signal_init();
     init_syscall();
     init_message();
+    ime_initialize();
 
     if (!OPENXJ380_INPUT_OUTPUT_DISABLED &&
         (BootConfig.boot_flags & (BOOT_FLAG_SAFE_MODE | BOOT_FLAG_DISABLE_KMOD | BOOT_FLAG_INSTALLER)) == 0) {

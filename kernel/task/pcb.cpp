@@ -20,6 +20,7 @@
 #include <pctable/gdt.h>
 #include <procfs.h>
 #include <syscall/syscall.h>
+#include <input_method.h>
 #include <task/ipc.h>
 
 #define SA_RPL3 3
@@ -387,6 +388,7 @@ void kill_proc0(pcb_t pcb)
     OpenXJ380Socket_NotifyProcessExit(pcb);
 #endif
 
+    ime_process_exit(pcb);
     procfs_on_exit_task(pcb);
 
     close_process_file_table(pcb);
