@@ -23,6 +23,7 @@ struct ImeModeNotice
 bool    ime_snapshot_mode_notice(ImeModeNotice *notice);
 void    ime_initialize();
 void    ime_service();
+void    ime_start_service();   // 起周期驱动内核线程（scheduler 就绪后调用）
 void    ime_set_focus(const ImeFocus *focus);
 void    ime_set_modifiers(uint32_t modifiers);
 void    ime_reset_input();

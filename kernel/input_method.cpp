@@ -114,6 +114,25 @@ void ime_initialize()
     initialized = true;
 }
 
+// 周期驱动 IME 服务：拉起引擎进程、检测卡死引擎 fail-open。
+// 上游由闭源图形 worker 周期调用；OpenXSKernel 无图形 worker，故用独立内核线程。
+static void ime_service_worker(void *)
+{
+    while (true)
+    {
+        ime_service();
+        scheduler_sleep_ns(20000000ULL);
+    }
+}
+
+void ime_start_service()
+{
+    static bool started = false;
+    if (started) return;
+    started = true;
+    create_kernel_thread((void *)ime_service_worker, NULL, (char *)"ime-service", NULL);
+}
+
 static int find_entry(const char *id)
 {
     for (uint32_t i = 0; i < registry.count; ++i)
