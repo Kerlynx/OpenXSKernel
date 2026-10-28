@@ -1,5 +1,4 @@
 #include <input_method.h>
-#include <cpu/lock.h>
 #include <cpu/msr.h>
 #include <errno.h>
 #include <fs/vfs/vfs.h>
@@ -16,7 +15,6 @@
 
 static ImeTextSink ime_text_sink;
 void ime_set_text_sink(ImeTextSink sink) { ime_text_sink = sink; }
-static spin_t getch_lock = SPIN_INIT;
 
 static bool message_pipe_write_handle_valid(tcb_t task, fd_file_handle **out_handle)
 {
@@ -172,14 +170,21 @@ void do_message_unfiltered(uint64_t msg_type, uint64_t hData, uint64_t lData, Ms
         xtttp_dtt *terminal = current->parent_group->xtttp_stc;
         char bytes[8]; memcpy(bytes, &lData, sizeof(bytes));
         size_t count = ime_utf8_scalar_bytes(bytes, 4);
-        spin_lock(&getch_lock);
-        if ((terminal->wait_for_getch || terminal->getch_count) && count && terminal->getch_count + count <= 128)
+        if (count)
         {
-            for (size_t i = 0; i < count; ++i)
-                terminal->getch_bytes[(terminal->getch_head + terminal->getch_count++) % 128] = bytes[i];
-            terminal->wait_for_getch = false;
+            // SPSC 无锁生产者：head 由本侧独占写，tail 由消费者独占写。
+            uint32_t head = terminal->getch_head;
+            uint32_t tail = terminal->getch_tail;
+            if (head - tail + count <= 128)
+            {
+                for (size_t i = 0; i < count; ++i)
+                    terminal->getch_bytes[(head + i) % 128] = bytes[i];
+                // release 发布 head：先让数据可见，再推进 head。
+                __asm__ __volatile__("mfence" ::: "memory");
+                terminal->getch_head = head + count;
+            }
+            // 满：丢弃本次按键（键盘输入可容忍丢键，不阻塞）
         }
-        spin_unlock(&getch_lock);
     }
 
     // 检查是否有注册的信号处理函数
@@ -207,17 +212,18 @@ void do_message(uint64_t msg_type, uint64_t hData, uint64_t lData, MsgPrcor WinM
 
 int message_getch_try(xtttp_dtt *terminal)
 {
-    spin_lock(&getch_lock);
-    int result = -1;
-    if (terminal->getch_count)
-    {
-        result = (unsigned char)terminal->getch_bytes[terminal->getch_head];
-        terminal->getch_head = (terminal->getch_head + 1) % 128;
-        --terminal->getch_count;
-    }
-    else terminal->wait_for_getch = true;
-    spin_unlock(&getch_lock);
-    return result;
+    // SPSC 无锁消费者：head 由生产者写，tail 由本侧独占写。
+    uint32_t head = terminal->getch_head;
+    __asm__ __volatile__("mfence" ::: "memory");  // acquire：head 先于数据读
+
+    uint32_t tail = terminal->getch_tail;
+    if (head == tail) return -1;  // 空
+
+    char c = terminal->getch_bytes[tail % 128];
+
+    __asm__ __volatile__("mfence" ::: "memory");  // 数据读完，推进 tail
+    terminal->getch_tail = tail + 1;
+    return (int)(unsigned char)c;
 }
 
 void init_message()

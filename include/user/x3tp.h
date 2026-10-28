@@ -24,10 +24,11 @@ typedef struct
     bool  is_shell;
     bool  input_lock;       // false = waiting input
     bool  output_lock;      // false = waiting flush
-    bool  wait_for_getch;   // true  = waiting getch
     bool  wait_for_input;   // true  = waiting input (for console)
-    char  char_for_getch;
-    uint32_t getch_head, getch_count;
+    // SPSC 无锁环形缓冲：getch_head 生产者独占写，getch_tail 消费者独占读。
+    // 二者单调递增（uint32 回绕安全），(head - tail) 即当前占用字节数。
+    volatile uint32_t getch_head;
+    volatile uint32_t getch_tail;
     char getch_bytes[128];
     uint32_t input_flags;
     char input[1024];
